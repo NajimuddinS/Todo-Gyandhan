@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-
+const API_URL = 'https://todo-gyandhyan.onrender.com/api/todos'
 function App() {
   const [todos, setTodos] = useState([])
   const [title, setTitle] = useState('')
@@ -12,60 +12,45 @@ function App() {
     description: '',
     priority: 'low'
   })
-
   // Fetch todos on component mount
   useEffect(() => {
     fetchTodos()
   }, [])
-
   const fetchTodos = async () => {
     try {
-      const response = await fetch('https://todo-gyandhyan.onrender.com/api/todos')
+      const response = await fetch(`${API_URL}/todos`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch todos')
+      }
       const data = await response.json()
       setTodos(data)
     } catch (error) {
       console.error('Error fetching todos:', error)
-
-      setTodos([
-        {
-          _id: '1',
-          title: 'Sample Todo',
-          description: 'This is a sample todo',
-          priority: 'high',
-          createdAt: new Date().toISOString()
-        }
-      ])
+      setTodos([])
     }
   }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title.trim() || !description.trim()) return
-
     const newTodo = {
       title,
       description,
       priority,
       createdAt: new Date().toISOString()
     }
-
     try {
-      const response = await fetch('https://todo-gyandhyan.onrender.com/api/todos', {
+      const response = await fetch(`${API_URL}/todos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(newTodo)
       })
-      const data = await response.json()
-      
-      // Mock response since we're frontend only
-      const mockResponse = {
-        ...newTodo,
-        _id: Date.now().toString()
+      if (!response.ok) {
+        throw new Error('Failed to create todo')
       }
-      
-      setTodos([...todos, mockResponse])
+      const data = await response.json()
+      setTodos([...todos, data])
       setTitle('')
       setDescription('')
       setPriority('low')
@@ -73,18 +58,19 @@ function App() {
       console.error('Error creating todo:', error)
     }
   }
-
   const handleDelete = async (id) => {
     try {
-      await fetch(`https://todo-gyandhyan.onrender.com/api/todos${id}`, {
+      const response = await fetch(`${API_URL}/todos/${id}`, {
         method: 'DELETE'
       })
+      if (!response.ok) {
+        throw new Error('Failed to delete todo')
+      }
       setTodos(todos.filter(todo => todo._id !== id))
     } catch (error) {
       console.error('Error deleting todo:', error)
     }
   }
-
   const handleEdit = (todo) => {
     setEditId(todo._id)
     setEditData({
@@ -93,22 +79,23 @@ function App() {
       priority: todo.priority
     })
   }
-
   const handleUpdate = async (e) => {
     e.preventDefault()
     if (!editData.title.trim() || !editData.description.trim()) return
-
     try {
-      const response = await fetch(`https://todo-gyandhyan.onrender.com/api/todos${editId}`, {
+      const response = await fetch(`${API_URL}/todos/${editId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(editData)
       })
-      
-      setTodos(todos.map(todo => 
-        todo._id === editId ? { ...todo, ...editData } : todo
+      if (!response.ok) {
+        throw new Error('Failed to update todo')
+      }
+      const updatedTodo = await response.json()
+      setTodos(todos.map(todo =>
+        todo._id === editId ? updatedTodo : todo
       ))
       setEditId(null)
       setEditData({
@@ -120,7 +107,6 @@ function App() {
       console.error('Error updating todo:', error)
     }
   }
-
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return 'priority-high'
@@ -129,11 +115,9 @@ function App() {
       default: return ''
     }
   }
-
   return (
     <div className="todo-container">
       <h1>Todo List</h1>
-      
       <form onSubmit={handleSubmit} className="todo-form">
         <div className="form-group">
           <input
@@ -142,12 +126,14 @@ function App() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
             className="todo-input"
+            required
           />
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description"
             className="todo-textarea"
+            required
           />
           <select
             value={priority}
@@ -161,7 +147,6 @@ function App() {
         </div>
         <button type="submit" className="add-button">Add Todo</button>
       </form>
-
       <ul className="todo-list">
         {todos.map(todo => (
           <li key={todo._id} className={`todo-item ${getPriorityColor(todo.priority)}`}>
@@ -172,11 +157,13 @@ function App() {
                   value={editData.title}
                   onChange={(e) => setEditData({...editData, title: e.target.value})}
                   className="edit-input"
+                  required
                 />
                 <textarea
                   value={editData.description}
                   onChange={(e) => setEditData({...editData, description: e.target.value})}
                   className="edit-textarea"
+                  required
                 />
                 <select
                   value={editData.priority}
@@ -215,5 +202,4 @@ function App() {
     </div>
   )
 }
-
 export default App
