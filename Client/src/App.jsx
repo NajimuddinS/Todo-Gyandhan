@@ -1,205 +1,284 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
+import { Toaster, toast } from 'react-hot-toast'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import './App.css'
-const API_URL = 'https://todo-gyandhyan.onrender.com/api/todos'
+
+function SortableItem({ todo, onDelete }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: todo._id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow cursor-move"
+    >
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="font-semibold">{todo.title}</h3>
+          <p className="text-gray-600">{todo.description}</p>
+          <span className={`inline-block px-2 py-1 rounded text-sm ${
+            todo.priority === 'High' ? 'bg-red-100 text-red-800' :
+            todo.priority === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-green-100 text-green-800'
+          }`}>
+            {todo.priority}
+          </span>
+        </div>
+        <button
+          onClick={() => onDelete(todo._id)}
+          className="text-red-500 hover:text-red-700"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [todos, setTodos] = useState([])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [priority, setPriority] = useState('low')
-  const [editId, setEditId] = useState(null)
-  const [editData, setEditData] = useState({
-    title: '',
-    description: '',
-    priority: 'low'
-  })
-  // Fetch todos on component mount
+  const [priority, setPriority] = useState('Moderate')
+  const [loading, setLoading] = useState(false)
+  const [sortBy, setSortBy] = useState('none')
+  const [sortDirection, setSortDirection] = useState('asc')
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const API_URL = 'https://todo-gyandhyan.onrender.com/api/todos'
+
   useEffect(() => {
     fetchTodos()
   }, [])
+
   const fetchTodos = async () => {
     try {
-      const response = await fetch(`${API_URL}/todos`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch todos')
-      }
-      const data = await response.json()
-      setTodos(data)
+      const response = await axios.get(API_URL)
+      setTodos(response.data)
     } catch (error) {
-      console.error('Error fetching todos:', error)
-      setTodos([])
+      toast.error('Failed to fetch todos')
     }
   }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!title.trim() || !description.trim()) return
-    const newTodo = {
-      title,
-      description,
-      priority,
-      createdAt: new Date().toISOString()
+    if (!title || !description) {
+      toast.error('Please fill all required fields')
+      return
     }
+
+    setLoading(true)
     try {
-      const response = await fetch(`${API_URL}/todos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTodo)
+      await axios.post(API_URL, {
+        title,
+        description,
+        priority
       })
-      if (!response.ok) {
-        throw new Error('Failed to create todo')
-      }
-      const data = await response.json()
-      setTodos([...todos, data])
+      toast.success('Todo added successfully')
       setTitle('')
       setDescription('')
-      setPriority('low')
+      setPriority('Moderate')
+      fetchTodos()
     } catch (error) {
-      console.error('Error creating todo:', error)
+      toast.error('Failed to add todo')
+    } finally {
+      setLoading(false)
     }
   }
+
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${id}`, {
-        method: 'DELETE'
-      })
-      if (!response.ok) {
-        throw new Error('Failed to delete todo')
-      }
-      setTodos(todos.filter(todo => todo._id !== id))
+      await axios.delete(`${API_URL}/${id}`)
+      toast.success('Todo deleted successfully')
+      fetchTodos()
     } catch (error) {
-      console.error('Error deleting todo:', error)
+      toast.error('Failed to delete todo')
     }
   }
-  const handleEdit = (todo) => {
-    setEditId(todo._id)
-    setEditData({
-      title: todo.title,
-      description: todo.description,
-      priority: todo.priority
-    })
-  }
-  const handleUpdate = async (e) => {
-    e.preventDefault()
-    if (!editData.title.trim() || !editData.description.trim()) return
-    try {
-      const response = await fetch(`${API_URL}/todos/${editId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editData)
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event
+
+    if (active.id !== over.id) {
+      setTodos((items) => {
+        const oldIndex = items.findIndex((item) => item._id === active.id)
+        const newIndex = items.findIndex((item) => item._id === over.id)
+        return arrayMove(items, oldIndex, newIndex)
       })
-      if (!response.ok) {
-        throw new Error('Failed to update todo')
-      }
-      const updatedTodo = await response.json()
-      setTodos(todos.map(todo =>
-        todo._id === editId ? updatedTodo : todo
-      ))
-      setEditId(null)
-      setEditData({
-        title: '',
-        description: '',
-        priority: 'low'
-      })
-    } catch (error) {
-      console.error('Error updating todo:', error)
     }
   }
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'priority-high'
-      case 'moderate': return 'priority-moderate'
-      case 'low': return 'priority-low'
-      default: return ''
+
+  const handleSort = (type) => {
+    if (type === sortBy) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortDirection('asc')
     }
+    setSortBy(type)
+    
+    if (type === 'none') {
+      fetchTodos()
+      return
+    }
+
+    const sortedTodos = [...todos]
+    
+    switch (type) {
+      case 'priority':
+        const priorityOrder = { 'High': 1, 'Moderate': 2, 'Low': 3 }
+        sortedTodos.sort((a, b) => {
+          const comparison = priorityOrder[a.priority] - priorityOrder[b.priority]
+          return sortDirection === 'asc' ? comparison : -comparison
+        })
+        break
+      case 'title':
+        sortedTodos.sort((a, b) => {
+          const comparison = a.title.localeCompare(b.title)
+          return sortDirection === 'asc' ? comparison : -comparison
+        })
+        break
+      case 'description':
+        sortedTodos.sort((a, b) => {
+          const comparison = a.description.localeCompare(b.description)
+          return sortDirection === 'asc' ? comparison : -comparison
+        })
+        break
+    }
+    
+    setTodos(sortedTodos)
   }
+
   return (
-    <div className="todo-container">
-      <h1>Todo List</h1>
-      <form onSubmit={handleSubmit} className="todo-form">
-        <div className="form-group">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title"
-            className="todo-input"
-            required
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description"
-            className="todo-textarea"
-            required
-          />
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="todo-select"
+    <div className="min-h-screen bg-gray-100 py-8 px-4 rounded-lg">
+      <Toaster position="top-right" />
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold text-center mb-8">Todo App</h1>
+        
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <div className="mb-4">
+            <label className="block text-gray-700 mb-2">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-2 border rounded"
+              placeholder="Enter title"
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-gray-700 mb-2">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-2 border rounded"
+              placeholder="Enter description"
+              rows="3"
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-gray-700 mb-2">Priority</label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full p-2 border rounded"
+            >
+              <option value="Low">Low</option>
+              <option value="Moderate">Moderate</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-50"
           >
-            <option value="low">Low Priority</option>
-            <option value="moderate">Moderate Priority</option>
-            <option value="high">High Priority</option>
+            {loading ? 'Adding...' : 'Add Todo'}
+          </button>
+        </form>
+
+        <div className="mb-4 flex justify-end items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => handleSort(e.target.value)}
+            className="p-2 border rounded"
+          >
+            <option value="none">Sort by...</option>
+            <option value="priority">Priority</option>
+            <option value="title">Title</option>
+            <option value="description">Description</option>
           </select>
+          {sortBy !== 'none' && (
+            <button
+              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+              className="p-2 border rounded hover:bg-gray-100"
+              title="Toggle sort direction"
+            >
+              {sortDirection === 'asc' ? '↑' : '↓'}
+            </button>
+          )}
         </div>
-        <button type="submit" className="add-button">Add Todo</button>
-      </form>
-      <ul className="todo-list">
-        {todos.map(todo => (
-          <li key={todo._id} className={`todo-item ${getPriorityColor(todo.priority)}`}>
-            {editId === todo._id ? (
-              <form onSubmit={handleUpdate} className="edit-form">
-                <input
-                  type="text"
-                  value={editData.title}
-                  onChange={(e) => setEditData({...editData, title: e.target.value})}
-                  className="edit-input"
-                  required
+
+        <div className="space-y-4">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={todos.map(todo => todo._id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {todos.map((todo) => (
+                <SortableItem
+                  key={todo._id}
+                  todo={todo}
+                  onDelete={handleDelete}
                 />
-                <textarea
-                  value={editData.description}
-                  onChange={(e) => setEditData({...editData, description: e.target.value})}
-                  className="edit-textarea"
-                  required
-                />
-                <select
-                  value={editData.priority}
-                  onChange={(e) => setEditData({...editData, priority: e.target.value})}
-                  className="edit-select"
-                >
-                  <option value="low">Low Priority</option>
-                  <option value="moderate">Moderate Priority</option>
-                  <option value="high">High Priority</option>
-                </select>
-                <button type="submit" className="update-button">Update</button>
-              </form>
-            ) : (
-              <>
-                <div className="todo-content">
-                  <h3 className="todo-title">{todo.title}</h3>
-                  <p className="todo-description">{todo.description}</p>
-                  <div className="todo-meta">
-                    <span className={`priority-badge ${getPriorityColor(todo.priority)}`}>
-                      {todo.priority}
-                    </span>
-                    <span className="created-at">
-                      {new Date(todo.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <div className="todo-buttons">
-                  <button onClick={() => handleEdit(todo)} className="edit-button">Edit</button>
-                  <button onClick={() => handleDelete(todo._id)} className="delete-button">Delete</button>
-                </div>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+      </div>
     </div>
   )
 }
+
 export default App
