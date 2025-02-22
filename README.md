@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/70466a67-63a9-43f5-8cd7-5e6f4e9e729c)# Todo-Gyandhan
+## Todo-Gyandhan
 
 A modern Full-Stack Todo App built using Node.js, Express, MongoDB (Backend) and React, Tailwind CSS (Frontend). This app allows users to create, edit, delete, sort and prioritize tasks efficiently.
 
