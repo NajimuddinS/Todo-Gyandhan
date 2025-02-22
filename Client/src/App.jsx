@@ -184,7 +184,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4 rounded-lg">
+    <div className="min-h-screen bg-violet-200 py-8 px-4 rounded-lg">
       <Toaster position="top-right" />
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8">Todo App</h1>
