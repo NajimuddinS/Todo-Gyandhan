@@ -29,8 +29,7 @@ RESTful API with Express.js and MongoDB
  ┣ 📂 Server              # Node.js + Express Backend
  ┃ ┣ 📂 config             # Database configuration
  ┃ ┣ 📂 models             # Mongoose models
- ┃ ┣ 📂 routes             # API routes
- ┃ ┣ 📜 server.js          # Main Express server
+ ┃ ┣ 📜 index.js          # Main Express server
  ┣ 📜 .gitignore           # Git Ignore file
  ┣ 📜 README.md            # Project Documentation
  ┣ 📜 package.json         # Dependencies & Scripts
