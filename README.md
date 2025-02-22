@@ -68,7 +68,7 @@ cd Todo-Gyandhan
 
 ### **Navigate to the Backend Folder**
 ```sh
-cd backend
+cd Server
 ```
 
 ### ** Install Dependencies**
